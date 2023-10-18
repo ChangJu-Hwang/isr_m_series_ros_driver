@@ -413,26 +413,28 @@ void ISR_M3::DeadReckoning(long dl_pulse, long dr_pulse)
   double scaler = 2.0 * M_PI * WHEEL_RADIUS_M / ENCODER_PPR / GEAR_RATIO;  // 2 pi*r
   double dl = scaler * dl_pulse;
   double dr = scaler * dr_pulse;
-  auto diff = (cur_encoder_time_ - prev_encoder_time_).toSec() / (double)1000.0;  // why divided by 1000?
+  auto diff = (cur_encoder_time_ - prev_encoder_time_).toSec();
 
-  velocity_.v = (dl + dr) / 2.0;
-  velocity_.w = (dr - dl) / WHEEL_BASE_M;
+  velocity_.v = (dl + dr) / (diff * 2.0);
+  velocity_.w = (dr - dl) / (diff * WHEEL_BASE_M);
 
 	// alias
   const auto& v = velocity_.v;
   const auto& w = velocity_.w;
 
-  if (-0.001 > w || w > 0.001)
+  if (std::fabs(w) > 0.001)
   {
-    position_.x += v / w * (sin(position_.theta + w) - sin(position_.theta));
-    position_.y -= v / w * (cos(position_.theta + w) - cos(position_.theta));
+    position_.x += v / w * (sin(position_.theta + w * diff) - sin(position_.theta));
+    position_.y -= v / w * (cos(position_.theta + w * diff) - cos(position_.theta));
   }
   else
   {
-    position_.x += v * cos(position_.theta);
-    position_.y += v * sin(position_.theta);
+    double ds = (dl + dr) / 2.0;
+
+    position_.x += ds * cos(position_.theta);
+    position_.y += ds * sin(position_.theta);
   }
-  position_.theta += w;
+  position_.theta += w * diff;
 }
 
 bool ISR_M3::SendData(uint8_t command, uint8_t numparam, uint8_t* params)
